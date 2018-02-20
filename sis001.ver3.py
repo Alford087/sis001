@@ -2,6 +2,7 @@
 #coding=utf-8
 
 import requests
+from bs4 import BeautifulSoup
 import re
 import logging
 import time
@@ -16,7 +17,7 @@ class sis001:
 		self.browse_headers ={'User-Agent':'Mozilla/5.0 (Windows NT 5.1; rv:22.0) Gecko/20100101 Firefox/22.0'}
 		LOG_FILENAME="d:\\sis001\\log.txt"
 		logging.basicConfig(filename=LOG_FILENAME,format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-		self.forumurl = 'http://38.103.161.185'
+		self.forumurl = 'http://38.103.161.139'
 		'''
 		http://38.103.161.185--good!
 		http://38.103.161.156
@@ -103,23 +104,44 @@ class ThreadGetTids(threading.Thread):
 	
 def down_link_imgs_torrents(topic):
 	print('GET:%s---%s'%(topic['url'],topic['title'].decode('gbk')))
-	dirname = get_valid_filename(topic['title'].decode('gbk')) #由于windows默认是gbk编码，建立文件夹时必须解码成gbk字符
+	#dirname = get_valid_filename(topic['title'].decode('gbk')) #由于windows默认是gbk编码，建立文件夹时必须解码成gbk字符
 	#print dirname
-	if not os.path.exists(dirname):
-		os.makedirs(dirname)
+	#if not os.path.exists(dirname):
+	#	os.makedirs(dirname)
 	topic_url = "%s/forum/%s"%(sis001.forumurl,topic['url'].decode('gbk'))
 	base_url = "%s/forum/"%(sis001.forumurl)
 	img_html = sis001.s.get(topic_url,headers=sis001.browse_headers,timeout=30)
 	imgs = re.findall(b'\<img src\=\"(http\:\/\/.*?\.jpg|attachments\/.*?\.jpg)\"', img_html.content, re.M | re.S) #匹配这个页面所有的图片链接
 	torrents = re.findall(b'a href=\"(?P<url>attach[=0-9a-zA-Z\.\?]+).*?>(?P<title>[^<>\"]*?torrent)', img_html.content, re.M | re.S) #匹配这个页面所有的种子链接
-    
+	soup = BeautifulSoup(img_html.content)    
+	articles = soup.find('div',attrs={'class':'t_msgfont'})
+	dr = re.compile(r'<br>',re.S)
+	dbr = dr.sub('',str(articles))
+	dr = re.compile(r'<[^>]+>',re.S)
+	dd = dr.sub('',dbr)
+	 
+		 
+		
 	imgs = set(imgs)
-	st = set(torrents) 
+	st = set(torrents)
+	if imgs or st:
+		dirname = get_valid_filename(topic['title'].decode('gbk')) #由于windows默认是gbk编码，建立文件夹时必须解码成gbk字符
+		if not os.path.exists(dirname):
+			os.makedirs(dirname)
+			with open(dirname+'\info.txt', 'a') as f:
+				 f.write(topic_url)
+				 f.write('\n')
+				 f.write('\n')
+				 f.write(dd.replace(u'\xa0',u' '))
+				 f.write('\n')
+				 f.close()
+      
+	
 	#print(imgs, st)
 	#logging.info(imgs,st)
 	for img in imgs:
 		img = img.decode('gbk')
-		down_link(img, dirname + '/' + get_valid_filename(os.path.basename(img)))
+		down_link(img,  dirname + '/' + get_valid_filename(os.path.basename(img)))
 	for t in st:
 		t0 = t[0].decode('gbk')
 		t1 = t[1].decode('gbk')
@@ -159,10 +181,12 @@ def get_valid_filename(filename): #如果文件名有数字字母和特殊字符
 
 	
 if __name__ == '__main__':
+         
 	start = time.time()
+	#print("\xd0\xec\xc0\xf6\xbb\xaa")
 	sis001 = sis001()
 	t = dict()
-	fids = {"版面代码":229} #需要采集的版面{"典藏":411,"熟妇":242,"自拍":62,"若兰居":495,"亚洲无码转帖":25,"亚洲无码原创":143,"亚洲有码原创":230,"欧美无码原创":229,"欧美无码分享":77}
+	fids = {"版面代码":467} # 良家 需要采集的版面{"典藏":411,"熟妇":242,"自拍":62,"若兰居":495,"亚洲无码转帖":25,"亚洲无码原创":143,"亚洲有码原创":230,"欧美无码原创":229,"欧美无码分享":77}
 	pages = range(1,11) #采集的页数
 	if not os.path.exists('av'):
 		os.makedirs('av')
